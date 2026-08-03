@@ -12,7 +12,6 @@ use std::{
     panic::{set_hook, take_hook},
 };
 
-#[derive(Default)]
 pub struct Editor {
     should_quit: bool,
     view: View,

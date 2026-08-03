@@ -1,8 +1,6 @@
 mod buffer;
 mod line;
 
-use std::cmp::min;
-
 use crate::{
     editor::{
         command::{Direction, EditorCommand},
@@ -10,6 +8,7 @@ use crate::{
     },
     terminal::{Position, Size, Terminal},
 };
+use std::cmp::min;
 
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");

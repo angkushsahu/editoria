@@ -1,47 +1,129 @@
-use crate::terminal::Size;
+use crate::editor::size::Size;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
-pub enum Direction {
+#[derive(Clone, Copy)]
+pub enum Move {
     PageUp,
     PageDown,
-    Home,
-    End,
+    StartOfLine,
+    EndOfLine,
     Up,
     Left,
     Right,
     Down,
 }
 
-pub enum EditorCommand {
-    Move(Direction),
-    Resize(Size),
-    Quit,
+#[derive(Clone, Copy)]
+pub enum Edit {
+    Insert(char),
+    InsertNewLine,
+    Delete,
+    DeleteBackward,
 }
 
-impl TryFrom<Event> for EditorCommand {
+#[derive(Clone, Copy)]
+pub enum System {
+    Save,
+    Resize(Size),
+    Quit,
+    Dismiss,
+}
+
+#[derive(Clone, Copy)]
+pub enum Command {
+    Move(Move),
+    Edit(Edit),
+    System(System),
+}
+
+impl TryFrom<KeyEvent> for Move {
+    type Error = String;
+
+    fn try_from(event: KeyEvent) -> Result<Self, Self::Error> {
+        let KeyEvent {
+            code, modifiers, ..
+        } = event;
+
+        if modifiers == KeyModifiers::NONE {
+            match code {
+                KeyCode::Up => Ok(Self::Up),
+                KeyCode::Down => Ok(Self::Down),
+                KeyCode::Left => Ok(Self::Left),
+                KeyCode::Right => Ok(Self::Right),
+                KeyCode::PageDown => Ok(Self::PageDown),
+                KeyCode::PageUp => Ok(Self::PageUp),
+                KeyCode::Home => Ok(Self::StartOfLine),
+                KeyCode::End => Ok(Self::EndOfLine),
+                _ => Err(format!("Unsupported code: {code:?}")),
+            }
+        } else {
+            Err(format!(
+                "Unsupported key code {code:?} or modifier {modifiers:?}"
+            ))
+        }
+    }
+}
+
+impl TryFrom<KeyEvent> for Edit {
+    type Error = String;
+
+    fn try_from(event: KeyEvent) -> Result<Self, Self::Error> {
+        match (event.code, event.modifiers) {
+            (KeyCode::Char(character), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+                Ok(Self::Insert(character))
+            }
+            (KeyCode::Tab, KeyModifiers::NONE) => Ok(Self::Insert('\t')),
+            (KeyCode::Enter, KeyModifiers::NONE) => Ok(Self::InsertNewLine),
+            (KeyCode::Backspace, KeyModifiers::NONE) => Ok(Self::DeleteBackward),
+            (KeyCode::Delete, KeyModifiers::NONE) => Ok(Self::Delete),
+            _ => Err(format!(
+                "Unsupported key code {:?} with modifiers {:?}",
+                event.code, event.modifiers
+            )),
+        }
+    }
+}
+
+impl TryFrom<KeyEvent> for System {
+    type Error = String;
+
+    fn try_from(event: KeyEvent) -> Result<Self, Self::Error> {
+        let KeyEvent {
+            code, modifiers, ..
+        } = event;
+
+        if modifiers == KeyModifiers::CONTROL {
+            match code {
+                KeyCode::Char('q') => Ok(Self::Quit),
+                KeyCode::Char('s') => Ok(Self::Save),
+                _ => Err(format!("Unsupported CONTROL+{code:?} combination)")),
+            }
+        } else if modifiers == KeyModifiers::NONE && matches!(code, KeyCode::Esc) {
+            Ok(Self::Dismiss)
+        } else {
+            Err(format!(
+                "Unsupported key code {code:?} or modifier {modifiers:?}"
+            ))
+        }
+    }
+}
+
+impl TryFrom<Event> for Command {
     type Error = String;
 
     fn try_from(event: Event) -> Result<Self, Self::Error> {
         match event {
-            Event::Key(KeyEvent {
-                code, modifiers, ..
-            }) => match (code, modifiers) {
-                (KeyCode::Char('q'), KeyModifiers::CONTROL) => Ok(Self::Quit),
-                (KeyCode::Up, _) => Ok(Self::Move(Direction::Up)),
-                (KeyCode::Down, _) => Ok(Self::Move(Direction::Down)),
-                (KeyCode::Left, _) => Ok(Self::Move(Direction::Left)),
-                (KeyCode::Right, _) => Ok(Self::Move(Direction::Right)),
-                (KeyCode::PageDown, _) => Ok(Self::Move(Direction::PageDown)),
-                (KeyCode::PageUp, _) => Ok(Self::Move(Direction::PageUp)),
-                (KeyCode::Home, _) => Ok(Self::Move(Direction::Home)),
-                (KeyCode::End, _) => Ok(Self::Move(Direction::End)),
-                _ => Err(format!("Key Code not supported: {code:?}")),
-            },
-            Event::Resize(width_u16, height_u16) => {
-                let height = height_u16 as usize;
-                let width = width_u16 as usize;
-                Ok(Self::Resize(Size { height, width }))
-            }
+            Event::Key(key_event) => Edit::try_from(key_event)
+                .map(Command::Edit)
+                .or_else(|_| Move::try_from(key_event).map(Command::Move))
+                .or_else(|_| System::try_from(key_event).map(Command::System))
+                .map_err(|_| format!("Event not supported: {key_event:?}")),
+
+            Event::Resize(width_u16, height_u16) => Ok(Self::System(System::Resize(Size {
+                height: height_u16 as usize,
+                width: width_u16 as usize,
+            }))),
+
             _ => Err(format!("Event not supported: {event:?}")),
         }
     }

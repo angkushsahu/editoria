@@ -20,6 +20,7 @@ pub trait UiComponent {
         if self.needs_redraw() {
             match self.draw(origin_row) {
                 Ok(()) => self.set_needs_redraw(false),
+                #[allow(unused_variables)]
                 Err(err) => {
                     #[cfg(debug_assertions)]
                     {

@@ -1,7 +1,9 @@
+use crate::types::{ColIndex, RowIndex};
+
 #[derive(Clone, Copy, Default)]
 pub struct Position {
-    pub col: usize,
-    pub row: usize,
+    pub col: ColIndex,
+    pub row: RowIndex,
 }
 
 impl Position {

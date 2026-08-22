@@ -1,6 +1,5 @@
+use crate::{editor::size::Size, types::RowIndex};
 use std::io::Error;
-
-use crate::editor::size::Size;
 
 pub trait UiComponent {
     fn set_needs_redraw(&mut self, value: bool);
@@ -14,19 +13,21 @@ pub trait UiComponent {
         self.set_needs_redraw(true);
     }
 
-    fn draw(&mut self, origin_row: usize) -> Result<(), Error>;
+    fn draw(&mut self, origin_row: RowIndex) -> Result<(), Error>;
 
-    fn render(&mut self, origin_row: usize) {
+    fn render(&mut self, origin_row: RowIndex) {
         if self.needs_redraw() {
-            match self.draw(origin_row) {
-                Ok(()) => self.set_needs_redraw(false),
-                #[allow(unused_variables)]
-                Err(err) => {
-                    #[cfg(debug_assertions)]
-                    {
-                        panic!("Could not render component: {err:?}");
-                    }
+            if let Err(err) = self.draw(origin_row) {
+                #[cfg(debug_assertions)]
+                {
+                    panic!("Could not render component: {err:?}");
                 }
+                #[cfg(not(debug_assertions))]
+                {
+                    let _ = err;
+                }
+            } else {
+                self.set_needs_redraw(false);
             }
         }
     }

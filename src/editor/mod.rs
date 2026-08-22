@@ -1,3 +1,4 @@
+mod annotated_string;
 mod command;
 mod command_bar;
 mod document_status;
@@ -12,9 +13,10 @@ mod view;
 
 use crate::editor::{
     command::{
+        edit::Edit::InsertNewLine,
+        move_command::Move::{Down, Left, Right, Up},
+        system::System::{Dismiss, Quit, Resize, Save, Search},
         Command::{self, Edit, Move, System},
-        Edit::InsertNewLine,
-        System::{Dismiss, Quit, Resize, Save, Search},
     },
     command_bar::CommandBar,
     message_bar::MessageBar,
@@ -91,7 +93,10 @@ impl Editor {
         editor.update_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
 
         let args: Vec<_> = env::args().collect();
+
         if let Some(file_name) = args.get(1) {
+            debug_assert!(!file_name.is_empty());
+
             if editor.view.load(file_name).is_err() {
                 editor.update_message(&format!("ERROR: Could not open file: {file_name}"));
             }
@@ -111,11 +116,15 @@ impl Editor {
 
             match read() {
                 Ok(event) => self.evaluate_event(event),
-                #[allow(unused_variables)]
+
                 Err(err) => {
                     #[cfg(debug_assertions)]
                     {
                         panic!("Could not read event: {err:?}");
+                    }
+                    #[cfg(not(debug_assertions))]
+                    {
+                        let _ = err;
                     }
                 }
             }
@@ -155,6 +164,9 @@ impl Editor {
             self.view.caret_position()
         };
 
+        debug_assert!(new_caret_pos.col <= self.terminal_size.width);
+        debug_assert!(new_caret_pos.row <= self.terminal_size.height);
+
         let _ = Terminal::move_caret_to(new_caret_pos);
         let _ = Terminal::show_caret();
         let _ = Terminal::execute();
@@ -177,6 +189,7 @@ impl Editor {
             _ => false,
         };
 
+        #[allow(clippy::collapsible_if)]
         if should_process {
             if let Ok(command) = Command::try_from(event) {
                 self.process_command(command);
@@ -296,11 +309,25 @@ impl Editor {
 
     fn process_command_during_search(&mut self, command: Command) {
         match command {
+            System(Dismiss) => {
+                self.set_prompt(PromptType::None);
+                self.view.dismiss_search();
+            }
+            Edit(InsertNewLine) => {
+                self.set_prompt(PromptType::None);
+                self.view.exit_search();
+            }
+            Edit(edit_command) => {
+                self.command_bar.handle_edit_command(edit_command);
+
+                let query = self.command_bar.value();
+                self.view.search(&query);
+            }
+            Move(Right | Down) => self.view.search_next(),
+            Move(Up | Left) => self.view.search_prev(),
             System(Quit | Resize(_) | Search | Save) | Move(_) => {
                 // Not applicable during save, resize already handled at this stage
             }
-            System(Dismiss) | Edit(InsertNewLine) => self.set_prompt(PromptType::None),
-            Edit(edit_command) => self.command_bar.handle_edit_command(edit_command),
         }
     }
 
@@ -318,7 +345,11 @@ impl Editor {
             // The above line ensures the message bar is properly painted during the next redraw
             // cycle
             PromptType::Save => self.command_bar.set_prompt("Save as: "),
-            PromptType::Search => self.command_bar.set_prompt("Search: "),
+            PromptType::Search => {
+                self.view.enter_search();
+                self.command_bar
+                    .set_prompt("Search (Esc to cancel, Arrows to navigate): ");
+            }
         }
 
         self.command_bar.clear_value();

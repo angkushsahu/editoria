@@ -1,7 +1,19 @@
+mod attribute;
+
+use crate::{
+    editor::{
+        annotated_string::AnnotatedString, position::Position, size::Size,
+        terminal::attribute::Attribute,
+    },
+    types::RowIndex,
+};
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     queue,
-    style::{Attribute, Print},
+    style::{
+        Attribute::{Reset, Reverse},
+        Print, ResetColor, SetBackgroundColor, SetForegroundColor,
+    },
     terminal::{
         disable_raw_mode, enable_raw_mode, size, Clear, ClearType, DisableLineWrap, EnableLineWrap,
         EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
@@ -9,8 +21,6 @@ use crossterm::{
     Command,
 };
 use std::io::{stdout, Error, Write};
-
-use crate::editor::{position::Position, size::Size};
 
 pub struct Terminal;
 
@@ -94,24 +104,60 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn print_row(row: usize, line_text: &str) -> Result<(), Error> {
+    pub fn print_row(row: RowIndex, line_text: &str) -> Result<(), Error> {
         Self::move_caret_to(Position { row, col: 0 })?;
         Self::clear_line()?;
         Self::print(line_text)?;
         Ok(())
     }
 
-    pub fn print_inverted_row(row: usize, line_text: &str) -> Result<(), Error> {
+    pub fn print_annotated_row(
+        row: RowIndex,
+        annotated_string: &AnnotatedString,
+    ) -> Result<(), Error> {
+        Self::move_caret_to(Position { row, col: 0 })?;
+        Self::clear_line()?;
+
+        annotated_string
+            .into_iter()
+            .try_for_each(|part| -> Result<(), Error> {
+                if let Some(annotation_type) = part.annotation_type {
+                    let attribute: Attribute = annotation_type.into();
+                    Self::set_attribute(&attribute)?;
+                }
+
+                Self::print(part.string)?;
+                Self::reset_color()?;
+
+                Ok(())
+            })?;
+
+        Ok(())
+    }
+
+    pub fn set_attribute(attribute: &Attribute) -> Result<(), Error> {
+        if let Some(foreground_color) = attribute.foreground {
+            Self::queue_command(SetForegroundColor(foreground_color))?;
+        }
+
+        if let Some(background_color) = attribute.background {
+            Self::queue_command(SetBackgroundColor(background_color))?;
+        }
+
+        Ok(())
+    }
+
+    fn reset_color() -> Result<(), Error> {
+        Self::queue_command(ResetColor)?;
+        Ok(())
+    }
+
+    pub fn print_inverted_row(row: RowIndex, line_text: &str) -> Result<(), Error> {
         let width = Self::size()?.width;
 
         Self::print_row(
             row,
-            &format!(
-                "{}{:width$.width$}{}",
-                Attribute::Reverse,
-                line_text,
-                Attribute::Reset
-            ),
+            &format!("{}{:width$.width$}{}", Reverse, line_text, Reset),
         )
     }
 

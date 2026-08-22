@@ -1,12 +1,15 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 
 #[derive(Default, Debug)]
 pub struct FileInfo {
     path: Option<PathBuf>,
 }
 
-impl std::fmt::Display for FileInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for FileInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = self
             .get_path()
             .and_then(|path| path.file_name())

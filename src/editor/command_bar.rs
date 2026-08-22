@@ -1,5 +1,8 @@
-use crate::editor::{
-    command::Edit, line::Line, size::Size, terminal::Terminal, ui_component::UiComponent,
+use crate::{
+    editor::{
+        command::edit::Edit, line::Line, size::Size, terminal::Terminal, ui_component::UiComponent,
+    },
+    types::{ColIndex, RowIndex},
 };
 use std::{cmp::min, io::Error};
 
@@ -22,7 +25,7 @@ impl CommandBar {
         self.set_needs_redraw(true);
     }
 
-    pub fn caret_position_col(&self) -> usize {
+    pub fn caret_position_col(&self) -> ColIndex {
         let max_width = self
             .prompt
             .len()
@@ -59,7 +62,7 @@ impl UiComponent for CommandBar {
         self.size = size;
     }
 
-    fn draw(&mut self, origin_y: usize) -> Result<(), Error> {
+    fn draw(&mut self, origin_y: RowIndex) -> Result<(), Error> {
         let area_for_value = self.size.width.saturating_sub(self.prompt.len());
         let value_end = self.value.width();
         let value_start = value_end.saturating_sub(area_for_value);

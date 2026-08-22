@@ -1,4 +1,6 @@
 mod editor;
+mod log;
+mod types;
 
 use editor::Editor;
 

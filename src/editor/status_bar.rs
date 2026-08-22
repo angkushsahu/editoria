@@ -1,5 +1,8 @@
-use crate::editor::{
-    document_status::DocumentStatus, size::Size, terminal::Terminal, ui_component::UiComponent,
+use crate::{
+    editor::{
+        document_status::DocumentStatus, size::Size, terminal::Terminal, ui_component::UiComponent,
+    },
+    types::RowIndex,
 };
 
 #[derive(Default)]
@@ -31,7 +34,7 @@ impl UiComponent for StatusBar {
         self.size = size;
     }
 
-    fn draw(&mut self, origin_row: usize) -> Result<(), std::io::Error> {
+    fn draw(&mut self, origin_row: RowIndex) -> Result<(), std::io::Error> {
         let line_count = self.current_status.line_count_to_string();
         let modified_indicator = self.current_status.modified_indicator_to_string();
 
